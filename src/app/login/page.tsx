@@ -116,7 +116,7 @@ export default function LoginPage() {
             <Store className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white">
-            &Stok
+            nStok
           </h1>
           <p className="text-xs text-zinc-400">
 
