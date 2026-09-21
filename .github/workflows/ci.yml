@@ -52,3 +52,18 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: '1'
+
+      - name: Dispatch Knowledge Update to nstok-knowledge-master
+        env:
+          DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT || secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          if [ -n "$DISPATCH_PAT" ]; then
+            echo "Memanggil repository_dispatch di nstok-id/nstok-knowledge-master..."
+            curl -s -X POST "https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token $DISPATCH_PAT" \
+              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": {\"repository\": \"nstok-app-POS\", \"branch\": \"${{ github.ref_name }}\", \"commit_hash\": \"${{ github.sha }}\", \"raw_url\": \"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}" || true
+            echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
+          else
+            echo "⚠️ Secret KNOWLEDGE_DISPATCH_PAT belum diset di GitHub Secrets nstok-app-POS."
+          fi

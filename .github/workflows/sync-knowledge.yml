@@ -1,38 +1,33 @@
-name: 🔄 Auto-Sync Knowledge Master
+name: Auto-Sync Knowledge Master
 
 on:
   push:
     branches:
       - main
       - master
-    paths:
-      - 'src/**'
-      - 'docs/**'
-      - 'PRD/**'
-      - '*.md'
   workflow_dispatch:
 
 jobs:
   sync-knowledge:
-    name: 🌲 Extract AST & Dispatch to Knowledge Master
+    name: Extract AST & Dispatch to Knowledge Master
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout Repository Code
+      - name: Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js 20
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: 🌲 Extract Code AST & Markdown Documents
+      - name: Extract Code AST & Markdown Documents
         env:
           REPO_NAME: nstok-app-POS
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: node scripts/extract-knowledge.mjs
 
-      - name: 🚀 Method 1: Webhook Dispatch to VPS Knowledge Master
+      - name: Webhook Dispatch to VPS Knowledge Master
         env:
           SYNC_URL: ${{ secrets.KNOWLEDGE_SYNC_URL }}
           SYNC_SECRET: ${{ secrets.KNOWLEDGE_SYNC_SECRET }}
@@ -47,7 +42,7 @@ jobs:
             echo "ℹ️ Webhook KNOWLEDGE_SYNC_URL belum diset (dilewati)."
           fi
 
-      - name: 📢 Method 2: Trigger GitHub Actions di nstok-knowledge-master (repository_dispatch)
+      - name: Trigger GitHub Actions di nstok-knowledge-master (repository_dispatch)
         env:
           DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT || secrets.ORG_ADMIN_TOKEN }}
         run: |
@@ -59,5 +54,5 @@ jobs:
               -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": {\"repository\": \"nstok-app-POS\", \"branch\": \"${{ github.ref_name }}\", \"commit_hash\": \"${{ github.sha }}\", \"raw_url\": \"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}" || true
             echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
           else
-            echo "ℹ️ Secret KNOWLEDGE_DISPATCH_PAT belum diset (opsional)."
+            echo "⚠️ Secret KNOWLEDGE_DISPATCH_PAT belum diset di GitHub Secrets nstok-app-POS."
           fi
