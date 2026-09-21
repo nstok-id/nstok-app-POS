@@ -53,11 +53,10 @@ jobs:
         run: |
           if [ -n "$DISPATCH_PAT" ]; then
             echo "Memanggil repository_dispatch di nstok-id/nstok-knowledge-master..."
-            PAYLOAD_CONTENT=$(cat knowledge-payload.json)
             curl -s -X POST "https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches" \
               -H "Accept: application/vnd.github.v3+json" \
               -H "Authorization: token $DISPATCH_PAT" \
-              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": $PAYLOAD_CONTENT}" || true
+              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": {\"repository\": \"nstok-app-POS\", \"branch\": \"${{ github.ref_name }}\", \"commit_hash\": \"${{ github.sha }}\", \"raw_url\": \"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}" || true
             echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
           else
             echo "ℹ️ Secret KNOWLEDGE_DISPATCH_PAT belum diset (opsional)."
