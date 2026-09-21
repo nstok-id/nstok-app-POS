@@ -54,16 +54,28 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
 
       - name: Dispatch Knowledge Update to nstok-knowledge-master
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         env:
-          DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT || secrets.ORG_ADMIN_TOKEN }}
+          DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT }}
         run: |
-          if [ -n "$DISPATCH_PAT" ]; then
-            echo "Memanggil repository_dispatch di nstok-id/nstok-knowledge-master..."
-            curl -s -X POST "https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token $DISPATCH_PAT" \
-              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": {\"repository\": \"nstok-app-POS\", \"branch\": \"${{ github.ref_name }}\", \"commit_hash\": \"${{ github.sha }}\", \"raw_url\": \"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}" || true
-            echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
+          if [ -z "$DISPATCH_PAT" ]; then
+            echo "⚠️ KNOWLEDGE_DISPATCH_PAT is not set in repository secrets."
+            exit 0
+          fi
+
+          echo "🚀 Sending repository_dispatch to nstok-id/nstok-knowledge-master..."
+          HTTP_CODE=$(curl -s -o resp.json -w "%{http_code}" -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $DISPATCH_PAT" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "User-Agent: nstok-app-POS-CI" \
+            https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches \
+            -d "{\"event_type\":\"sync-knowledge\",\"client_payload\":{\"repository\":\"nstok-app-POS\",\"branch\":\"${{ github.ref_name }}\",\"commit_hash\":\"${{ github.sha }}\",\"raw_url\":\"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}")
+
+          echo "GitHub API Response Code: $HTTP_CODE"
+          cat resp.json
+          if [ "$HTTP_CODE" -eq 204 ]; then
+            echo "🎉 repository_dispatch SUCCESS! Sinyal diterima oleh nstok-knowledge-master (HTTP 204)."
           else
-            echo "⚠️ Secret KNOWLEDGE_DISPATCH_PAT belum diset di GitHub Secrets nstok-app-POS."
+            echo "⚠️ Dispatch response: $HTTP_CODE"
           fi
