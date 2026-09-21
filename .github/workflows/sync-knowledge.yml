@@ -10,7 +10,7 @@ on:
       - 'docs/**'
       - 'PRD/**'
       - '*.md'
-  workflow_dispatch: # Memungkinkan trigger manual dari web GitHub
+  workflow_dispatch:
 
 jobs:
   sync-knowledge:
@@ -27,36 +27,38 @@ jobs:
 
       - name: 🌲 Extract Code AST & Markdown Documents
         env:
-          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_NAME: nstok-app-POS
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: node scripts/extract-knowledge.mjs
 
-      - name: 🚀 Dispatch Payload to VPS Knowledge Master
+      - name: 🚀 Method 1: Webhook Dispatch to VPS Knowledge Master
         env:
           SYNC_URL: ${{ secrets.KNOWLEDGE_SYNC_URL }}
           SYNC_SECRET: ${{ secrets.KNOWLEDGE_SYNC_SECRET }}
         run: |
-          if [ -z "$SYNC_URL" ] || [ -z "$SYNC_SECRET" ]; then
-            echo "⚠️ Secret KNOWLEDGE_SYNC_URL atau KNOWLEDGE_SYNC_SECRET belum diset di repository ini."
-            echo "ℹ️ Harap tambahkan di Settings -> Secrets -> Actions:"
-            echo "   KNOWLEDGE_SYNC_URL = https://mcp.nstok.my.id/api/sync-knowledge"
-            echo "   KNOWLEDGE_SYNC_SECRET = (Token rahasia Anda)"
-            exit 0
+          if [ -n "$SYNC_URL" ] && [ -n "$SYNC_SECRET" ]; then
+            echo "Mengirimkan knowledge-payload.json ke Webhook $SYNC_URL..."
+            curl -s -X POST "$SYNC_URL" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $SYNC_SECRET" \
+              -d @knowledge-payload.json || true
+          else
+            echo "ℹ️ Webhook KNOWLEDGE_SYNC_URL belum diset (dilewati)."
           fi
 
-          echo "Mengirimkan knowledge-payload.json ke $SYNC_URL..."
-          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" -X POST "$SYNC_URL" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer $SYNC_SECRET" \
-            -d @knowledge-payload.json)
-
-          echo "Response HTTP Status: $HTTP_STATUS"
-          cat response.txt
-
-          if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 201 ]; then
-            echo "❌ Gagal menyinkronkan knowledge base!"
-            exit 1
+      - name: 📢 Method 2: Trigger GitHub Actions di nstok-knowledge-master (repository_dispatch)
+        env:
+          DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT || secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          if [ -n "$DISPATCH_PAT" ]; then
+            echo "Memanggil repository_dispatch di nstok-id/nstok-knowledge-master..."
+            PAYLOAD_CONTENT=$(cat knowledge-payload.json)
+            curl -s -X POST "https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token $DISPATCH_PAT" \
+              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": $PAYLOAD_CONTENT}" || true
+            echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
+          else
+            echo "ℹ️ Secret KNOWLEDGE_DISPATCH_PAT belum diset (opsional)."
           fi
-
-          echo "🎉 Sinkronisasi ke VPS Knowledge Master Berhasil!"
