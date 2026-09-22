@@ -9,50 +9,39 @@ on:
 
 jobs:
   sync-knowledge:
-    name: Extract AST & Dispatch to Knowledge Master
+    name: Extract AST & Sync to Knowledge Master
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository Code
+      - name: 📥 Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: ⚙️ Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Extract Code AST & Markdown Documents
+      - name: 🌲 Extract Code AST & Markdown Documents
         env:
           REPO_NAME: nstok-app-POS
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: node scripts/extract-knowledge.mjs
 
-      - name: Webhook Dispatch to VPS Knowledge Master
+      - name: 🚀 Dispatch Payload to Knowledge Master Webhook
         env:
-          SYNC_URL: ${{ secrets.KNOWLEDGE_SYNC_URL }}
-          SYNC_SECRET: ${{ secrets.KNOWLEDGE_SYNC_SECRET }}
+          SYNC_URL: ${{ secrets.KNOWLEDGE_SYNC_URL || 'https://mcp.nstok.my.id/api/sync-knowledge' }}
+          SYNC_SECRET: ${{ secrets.KNOWLEDGE_SYNC_SECRET || 'nstok_sec_token_v2_prod_99218' }}
         run: |
-          if [ -n "$SYNC_URL" ] && [ -n "$SYNC_SECRET" ]; then
-            echo "Mengirimkan knowledge-payload.json ke Webhook $SYNC_URL..."
-            curl -s -X POST "$SYNC_URL" \
-              -H "Content-Type: application/json" \
-              -H "Authorization: Bearer $SYNC_SECRET" \
-              -d @knowledge-payload.json || true
-          else
-            echo "ℹ️ Webhook KNOWLEDGE_SYNC_URL belum diset (dilewati)."
-          fi
+          echo "🚀 Mengirimkan knowledge-payload.json ke $SYNC_URL..."
+          HTTP_CODE=$(curl -s -o resp.json -w "%{http_code}" -X POST "$SYNC_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $SYNC_SECRET" \
+            -d @knowledge-payload.json)
 
-      - name: Trigger GitHub Actions di nstok-knowledge-master (repository_dispatch)
-        env:
-          DISPATCH_PAT: ${{ secrets.KNOWLEDGE_DISPATCH_PAT || secrets.ORG_ADMIN_TOKEN }}
-        run: |
-          if [ -n "$DISPATCH_PAT" ]; then
-            echo "Memanggil repository_dispatch di nstok-id/nstok-knowledge-master..."
-            curl -s -X POST "https://api.github.com/repos/nstok-id/nstok-knowledge-master/dispatches" \
-              -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token $DISPATCH_PAT" \
-              -d "{\"event_type\": \"sync-knowledge\", \"client_payload\": {\"repository\": \"nstok-app-POS\", \"branch\": \"${{ github.ref_name }}\", \"commit_hash\": \"${{ github.sha }}\", \"raw_url\": \"https://raw.githubusercontent.com/nstok-id/nstok-app-POS/${{ github.ref_name }}/knowledge-payload.json\"}}" || true
-            echo "✅ Dispatch signal berhasil dikirim ke nstok-knowledge-master!"
+          echo "HTTP Response Status: $HTTP_CODE"
+          cat resp.json
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 201 ]; then
+            echo "🎉 Sinkronisasi ke Knowledge Master BERHASIL!"
           else
-            echo "⚠️ Secret KNOWLEDGE_DISPATCH_PAT belum diset di GitHub Secrets nstok-app-POS."
+            echo "⚠️ Server webhook response: $HTTP_CODE"
           fi
