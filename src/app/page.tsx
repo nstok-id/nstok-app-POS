@@ -1,27 +1,31 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { SplashScreen } from "@/components/SplashScreen";
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const [isReadyToRedirect, setIsReadyToRedirect] = useState(false);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace("/pos");
+  const handleSplashComplete = () => {
+    setIsReadyToRedirect(true);
+    if (isAuthenticated && user) {
+      if (!user.hasCompletedOnboarding) {
+        router.replace("/business-select");
+      } else {
+        router.replace("/pos");
+      }
     } else {
       router.replace("/login");
     }
-  }, [isAuthenticated, router]);
+  };
 
   return (
-    <div className="flex-1 flex items-center justify-center p-8 bg-background">
-      <div className="text-center space-y-3">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-sm text-muted-foreground">Memuat nstok-app-POS...</p>
-      </div>
-    </div>
+    <main className="min-h-screen w-full bg-slate-950">
+      <SplashScreen onComplete={handleSplashComplete} minDurationMs={1800} />
+    </main>
   );
 }
